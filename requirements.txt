@@ -1,4 +1,5 @@
 -i https://pypi.org/simple
+argparse==1.4.0
 arrow==1.2.3; python_version >= '3.6'
 asteval==0.9.31; python_version >= '3.7'
 branca==0.6.0; python_version >= '3.7'

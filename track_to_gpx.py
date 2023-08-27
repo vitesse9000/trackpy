@@ -3,6 +3,16 @@ import pandas as pd
 import pathlib
 import logging
 import trackpy as track
+import argparse
+
+parser = argparse.ArgumentParser(description='Convert track CSV into GPX file')
+parser.add_argument('--input', '-i', help='CSV file to read')
+parser.add_argument('--output', '-o', help='GPX file to write')
+
+args = parser.parse_args()
+
+csvfile = args.input
+gpxfile = args.output
 
 # Configure the logging level and format
 logging.basicConfig(level=logging.DEBUG,
@@ -18,13 +28,12 @@ wielercentrum = track.velodrome.Velodrome(
     start_finish=np.round(np.pi * 27.7 + 2 * 38, decimals=1),
 )
 
-filename = pathlib.Path("csvs/report.csv")
+filename = pathlib.Path(csvfile)
 logging.info(f"Parsing {filename}")
 transponder = track.parse_transponder(filename)
 
 logging.info(f"Mapping {filename} to the Eddy Merck wielercentrum")
 interpolation = track.map_interpolation_to_velodrome(transponder, wielercentrum)
 
-output = "example.gpx"
-logging.info(f"Writing to {output}")
-track.write_gpx(output, interpolation, velodrome=wielercentrum)
+logging.info(f"Writing to {gpxfile}")
+track.write_gpx(gpxfile, interpolation, velodrome=wielercentrum)
