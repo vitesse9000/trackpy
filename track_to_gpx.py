@@ -5,18 +5,23 @@ import logging
 import trackpy as track
 import argparse
 
-parser = argparse.ArgumentParser(description='Convert track CSV into GPX file')
-parser.add_argument('--input', '-i', help='CSV file to read')
-parser.add_argument('--output', '-o', help='GPX file to write')
+# Configure the logging level and format
+logging.basicConfig(level=logging.DEBUG,
+                    format='%(asctime)s - %(levelname)s - %(message)s')
+
+parser = argparse.ArgumentParser(description='Convert track CSV into GPX file.')
+parser.add_argument('--input', '-i', help='CSV file to read.')
+parser.add_argument('--output', '-o', help='GPX file to write.')
+parser.add_argument('--sessions', '-s', help='Which sessions to include. Omit to include all sessions.')
 
 args = parser.parse_args()
 
 csvfile = args.input
 gpxfile = args.output
-
-# Configure the logging level and format
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+if args.sessions is None:
+    sessions = None
+else:
+    sessions = list(map(int, args.sessions.split(',')))
 
 wielercentrum = track.velodrome.Velodrome(
     "Eddy Mercx Wielercentrum",
@@ -29,8 +34,14 @@ wielercentrum = track.velodrome.Velodrome(
 )
 
 filename = pathlib.Path(csvfile)
-logging.info(f"Parsing {filename}")
-transponder = track.parse_transponder(filename)
+parsing_info = f"Parsing {filename}"
+if sessions:
+    parsing_info += f" for sessions {sessions}"
+else:
+    parsing_info += f" for all sessions"
+    
+logging.info(parsing_info)
+transponder = track.parse_transponder(filename, sessions=sessions)
 
 logging.info(f"Mapping {filename} to the Eddy Merck wielercentrum")
 interpolation = track.map_interpolation_to_velodrome(transponder, wielercentrum)
