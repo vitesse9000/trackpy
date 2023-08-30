@@ -11,4 +11,4 @@ Code to convert sporthive csv files to gpx files.
 
 # Options
 It's possible to only use a subset of the sessions available in the sporthive csv file. This can be done as follows
-`python3 track_to_gpx.py --input="example.csv" --output="example.gpx" --sessions=[2,3]`
+`python3 track_to_gpx.py --input="example.csv" --output="example.gpx" --sessions=2,3`
