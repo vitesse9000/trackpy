@@ -1,7 +1,7 @@
 import pandas as pd
 
 
-def read_transponder(filename=None, length=250):
+def read_transponder(filename=None, length=250, sessions=None):
     df = pd.read_csv(filename, encoding="utf-16-le").dropna(how="all")
 
     # add time and date
@@ -18,6 +18,10 @@ def read_transponder(filename=None, length=250):
 
     # add sessions
     df["Session"] = (df["Lap"] != df["Lap"].shift(1) + 1).cumsum()
+
+    # filter on desired sessions
+    if sessions:
+        df = df.query("Session in @sessions").copy()
 
     # convert speed string to float
     df["Speed"] = df["Speed"].str.replace(" km/h", "").astype(float) / 3.6
@@ -176,12 +180,9 @@ def map_interpolation_to_velodrome(interpolation, velodrome):
 
     return result
 
-def parse_transponder(filename, length=250, tz="Europe/Brussels", sessions=[]):
-    transponder = read_transponder(filename, length=length)
-
-    if sessions:
-        transponder = transponder.query("session in @sessions")
-
+def parse_transponder(filename, length=250, tz="Europe/Brussels", sessions=None):
+    
+    transponder = read_transponder(filename, length=length, sessions=sessions)
     interpolation = interpolate(transponder, length=length, tz=tz)
 
     return interpolation
