@@ -176,9 +176,12 @@ def map_interpolation_to_velodrome(interpolation, velodrome):
 
     return result
 
-
-def parse_transponder(filename, length=250, tz="Europe/Brussels"):
+def parse_transponder(filename, length=250, tz="Europe/Brussels", sessions=[]):
     transponder = read_transponder(filename, length=length)
+
+    if sessions:
+        transponder = transponder.query("session in @sessions")
+
     interpolation = interpolate(transponder, length=length, tz=tz)
 
     return interpolation
