@@ -31,13 +31,13 @@ def read_transponder(filename=None, length=250, sessions=None):
 
     # reorder columns
     df = df[
-        [
-            "Timestamp",
-            "Session",
-            "Lap",
-            "Laptime",
-            "Speed",
-        ]
+       [
+           "Timestamp",
+           "Session",
+           "Lap",
+           "Laptime",
+           "Speed",
+       ]
     ]
 
     # rename columns
@@ -48,7 +48,6 @@ def read_transponder(filename=None, length=250, sessions=None):
         }
     )
 
-    df = df.set_index(["Session", "Lap"])
     df["Distance (m)"] = (
         (df["Laptime (s)"] * df["Average speed (m/s)"]).cumsum().round()
     )
@@ -56,22 +55,7 @@ def read_transponder(filename=None, length=250, sessions=None):
     return df
 
 
-def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
-    # trick to copy each row t amount of times where t is the number of seconds needed to complete the quarter
-    lap_distances["Laptime rounded (s)"] = (
-        lap_distances["Laptime (s)"].round(0).astype(int)
-    )
-
-    # add counter to keep track of all interpolated values
-    lap_distances["Distance counter"] = lap_distances["Laptime rounded (s)"].apply(
-        lambda x: list(range(0, x))
-    )
-    lap_distances["Laptime rounded (s)"] = lap_distances["Laptime rounded (s)"].apply(
-        lambda x: [x] * x
-    )
-
-    lap_distances = lap_distances.explode(["Laptime rounded (s)", "Distance counter"])
-
+def _add_missing_observations(lap_distances):
     # add observations where time continues, but the rider stand still
     # this is such that Strava detects these as auto pauses
     # calculate how many seconds are between each sessions, i.e. how long did the rider pause
@@ -104,6 +88,26 @@ def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
 
         lap_distances = pd.concat([lap_distances, extra_observations]).fillna(0)
 
+    return lap_distances
+
+
+def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
+    # trick to copy each row t amount of times where t is the number of seconds needed to complete the quarter
+    lap_distances["Laptime rounded (s)"] = (
+        lap_distances["Laptime (s)"].round(0).astype(int)
+    )
+
+    # add counter to keep track of all interpolated values
+    lap_distances["Distance counter"] = lap_distances["Laptime rounded (s)"].apply(
+        lambda x: list(range(0, x))
+    )
+    lap_distances["Laptime rounded (s)"] = lap_distances["Laptime rounded (s)"].apply(
+        lambda x: [x] * x
+    )
+    lap_distances = lap_distances.explode(["Laptime rounded (s)", "Distance counter"])
+
+    # add observations for every paused second
+    lap_distances = _add_missing_observations(lap_distances)
     lap_distances = lap_distances.sort_values(by=["Session", "Lap", "Timestamp"])
 
     # add time counter used to determine intermediate distance and total elapsed time
@@ -139,14 +143,14 @@ def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
 
     # remove intermediate columns needed for calculations
     lap_distances = lap_distances.drop(
-        columns=[
-            "Laptime (s)",
-            "Distance (m)",
-            "Laptime rounded (s)",
-            "Total elapsed interpolated time (s)",
-            "Distance counter",
-            "Time counter",
-        ]
+       columns=[
+           "Laptime (s)",
+           "Distance (m)",
+           "Laptime rounded (s)",
+           "Total elapsed interpolated time (s)",
+           "Distance counter",
+           "Time counter",
+       ]
     )
 
     # between two sessions, the riders leaves the track
@@ -159,7 +163,6 @@ def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
     # due to numerical precision
     # there can be a few observations that start a new lap, which isn't there in reality
     # set distance covered 0 for these observations
-    lap_distances = lap_distances.reset_index()
     last_element_above_230 = lap_distances[::-1]["Distance covered"].gt(230).idxmax()
     lap_distances.loc[last_element_above_230 + 1 :, "Distance covered"] = 0
 
@@ -168,6 +171,7 @@ def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
 
 def map_interpolation_to_velodrome(interpolation, velodrome):
     arc_length = velodrome.arc_length_wgs84
+
     interpolation = interpolation[
         ["Interpolated distance (m)", "Distance covered", "Interpolated time (s)"]
     ]
@@ -176,12 +180,11 @@ def map_interpolation_to_velodrome(interpolation, velodrome):
         arc_length, left_on="Distance covered", right_on="Arc length (m)", how="left"
     )
 
-    # result = result.drop(columns=["Distance covered"])
-
     return result
 
+
 def parse_transponder(filename, length=250, tz="Europe/Brussels", sessions=None):
-    
+
     transponder = read_transponder(filename, length=length, sessions=sessions)
     interpolation = interpolate(transponder, length=length, tz=tz)
 
