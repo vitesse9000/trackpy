@@ -1,11 +1,8 @@
-import folium
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import pyproj
 
 
-class Velodrome:
+class BaseVelodrome:
     def __init__(
         self,
         name,
@@ -15,50 +12,58 @@ class Velodrome:
         length=None,
         elevation=None,
         precision=0.1,
+        arc_length_utm=None,
+        arc_length_wgs84=None,
         # TO DO
         # calculate this in some easier way for users
         start_finish=None,
     ):
         self.name = name
-
-        if center_utm:
-            self.center_utm = center_utm
-            self.lat_utm, self.long_utm = self.center_utm
-
-            # determine wgs84 coordinates
-            self.center_wgs84 = self.transform_coordinates(
-                self.center_utm, from_coor="utm"
-            )
-            self.lat_wgs84, self.long_wgs84 = self.center_wgs84
-
-        if center_wgs84:
-            self.center_wgs84 = center_wgs84
-            self.lat_wgs84, self.long_wgs84 = self.center_wgs84
-
-            # determine utm84 coordinates
-            self.center_utm = self.transform_coordinates(
-                self.center_wgs84, from_coor="wgs84"
-            )
-            self.lat_utm, self.long_utm = self.center_utm
-
-        self.length = length
-        self.rotation = rotation
-        # use https://api.open-elevation.com/api/v1/lookup?locations=51.04682000579793,3.69245806519157
-        self.elevation = elevation
-        self.precision = precision
         self.start_finish = start_finish
+        self.elevation = elevation
 
-        # set corner radius and straight distance and corresponding precision
-        self.determine_velodrome_dimensions()
+        # coordinates and arc_length is available
+        if arc_length_wgs84 is not None:
+            self.arc_length_wgs84 = arc_length_wgs84
 
-        # build velodrome
-        self.coordinates_utm = self.build_velodrome()
-        self.coordinates_wgs84 = self.transform_coordinates(
-            self.coordinates_utm, from_coor="utm"
-        )
+        # no coordinates are provided, built velodrome from scratch
+        else:
+            if center_utm:
+                self.center_utm = center_utm
+                self.lat_utm, self.long_utm = self.center_utm
 
-        # determine arc length for both coordinate system
-        self.arc_length_utm, self.arc_length_wgs84 = self.calculate_arc_length()
+                # determine wgs84 coordinates
+                self.center_wgs84 = self.transform_coordinates(
+                    self.center_utm, from_coor="utm"
+                )
+                self.lat_wgs84, self.long_wgs84 = self.center_wgs84
+
+            if center_wgs84:
+                self.center_wgs84 = center_wgs84
+                self.lat_wgs84, self.long_wgs84 = self.center_wgs84
+
+                # determine utm84 coordinates
+                self.center_utm = self.transform_coordinates(
+                    self.center_wgs84, from_coor="wgs84"
+                )
+                self.lat_utm, self.long_utm = self.center_utm
+
+            self.length = length
+            self.rotation = rotation
+            # use https://api.open-elevation.com/api/v1/lookup?locations=51.04682000579793,3.69245806519157
+            self.precision = precision
+
+            # set corner radius and straight distance and corresponding precision
+            self.determine_velodrome_dimensions()
+
+            # build velodrome
+            self.coordinates_utm = self.build_velodrome()
+            self.coordinates_wgs84 = self.transform_coordinates(
+                self.coordinates_utm, from_coor="utm"
+            )
+
+            # determine arc length for both coordinate system
+            self.arc_length_utm, self.arc_length_wgs84 = self.calculate_arc_length()
 
     def determine_velodrome_dimensions(self):
 
@@ -78,6 +83,8 @@ class Velodrome:
     def transform_coordinates(
         self, points, from_coor="utm", to_coor="wgs84", utm_zone=31
     ):
+        import pyproj
+
         """
         Zone 31 is Belgium.
         """
@@ -229,7 +236,10 @@ class Velodrome:
 
         return arc_length_utm, arc_length_wgs84
 
+
+class Velodrome(BaseVelodrome):
     def plot_velodrome(self):
+        import matplotlib.pyplot as plt
 
         x, y = zip(*self.coordinates_utm)
         fig, ax = plt.subplots()
@@ -243,6 +253,7 @@ class Velodrome:
         return ax
 
     def osm_velodrome(self):
+        import folium
 
         # construct openstreetmap plot
         # velodromes are small, so zoom in to max zoom == 18
@@ -264,3 +275,10 @@ class Velodrome:
         ).add_to(osm_map)
 
         return osm_map
+    
+    def save(self, filename=None):
+        
+        if not filename:
+            filename = f"{self.name.replace(' ', '_').lower()}_wgs84.csv"
+            
+        self.arc_length_wgs84.to_csv(filename, index=False)
