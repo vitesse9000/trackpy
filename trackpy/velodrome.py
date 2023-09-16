@@ -3,6 +3,53 @@ import pandas as pd
 
 
 class BaseVelodrome:
+    """
+    Class for representing a velodrome's geometry and attributes.
+
+    Attributes
+    ----------
+    name : str
+        Name of the velodrome.
+    center_utm : tuple of float, optional
+        UTM coordinates of the velodrome's center (latitude, longitude).
+    center_wgs84 : tuple of float, optional
+        WGS84 coordinates of the velodrome's center (latitude, longitude).
+    rotation : float, optional
+        Rotation angle of the velodrome in degrees.
+    length : float, optional
+        Length of the velodrome in meters.
+    elevation : float, optional
+        Elevation of the velodrome in meters.
+    precision : float, optional
+        Precision for calculating the velodrome's geometry. Default is 0.1 meters.
+    start_finish : float, optional
+        Position of the start/finish line as expressed in meters across the arc length of the velodrome.
+    arc_length_utm : pd.DataFrame, optional
+        DataFrame containing the arc length in UTM coordinates.
+    arc_length_wgs84 : pd.DataFrame, optional
+        DataFrame containing the arc length in WGS84 coordinates.
+
+    Methods
+    -------
+    determine_velodrome_dimensions():
+        Determine the dimensions of the velodrome based on its length.
+    transform_coordinates(points, from_coor='utm', to_coor='wgs84', utm_zone=31):
+        Transform coordinates between UTM and WGS84 systems.
+    build_corner(center, direction='left'):
+        Build a corner of the velodrome.
+    build_straight(start, direction='left'):
+        Build a straight section of the velodrome.
+    rotate_points(points, center, angle=0):
+        Rotate a set of points around a center point.
+    build_velodrome():
+        Build the geometry of the velodrome.
+    calculate_arc_length():
+        Calculate the arc length of the velodrome in both UTM and WGS84 coordinates.
+
+    Notes
+    -----
+    The class can either accept pre-calculated arc lengths or calculate them based on provided dimensions and UTM coordinates.
+    """
     def __init__(
         self,
         name,

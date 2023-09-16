@@ -6,13 +6,16 @@ import trackpy as track
 import argparse
 
 # Configure the logging level and format
-logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-parser = argparse.ArgumentParser(description='Convert track CSV into GPX file.')
-parser.add_argument('--input', '-i', help='CSV file to read.')
-parser.add_argument('--output', '-o', help='GPX file to write.')
-parser.add_argument('--sessions', '-s', help='Which sessions to include. Omit to include all sessions.')
+parser = argparse.ArgumentParser(description="Convert track CSV into GPX file.")
+parser.add_argument("--input", "-i", help="CSV file to read.")
+parser.add_argument("--output", "-o", help="GPX file to write.")
+parser.add_argument(
+    "--sessions", "-s", help="Which sessions to include. Omit to include all sessions."
+)
 
 args = parser.parse_args()
 
@@ -21,7 +24,7 @@ gpxfile = args.output
 if args.sessions is None:
     sessions = None
 else:
-    sessions = list(map(int, args.sessions.split(',')))
+    sessions = list(map(int, args.sessions.split(",")))
 
 wielercentrum = track.velodrome.Velodrome(
     "Eddy Mercx Wielercentrum",
@@ -39,7 +42,7 @@ if sessions:
     parsing_info += f" for sessions {sessions}"
 else:
     parsing_info += f" for all sessions"
-    
+
 logging.info(parsing_info)
 transponder = track.parse_transponder(filename, sessions=sessions)
 

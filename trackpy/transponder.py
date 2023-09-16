@@ -2,6 +2,55 @@ import pandas as pd
 
 
 def read_transponder(filename=None, length=250, sessions=None):
+    """
+    Read and preprocess a csv file from https://results.sporthive.com containing transponder data.
+
+    This function reads a csv file, performs various data transformations,
+    and returns a DataFrame with the processed data. The DataFrame will
+    contain columns for timestamp, session, lap, lap time, average speed,
+    and distance.
+
+    Parameters
+    ----------
+    filename : str, optional
+        The path to the csv file to read.
+    length : int, optional
+        The length of the track in meters. The default is 250.
+    sessions : list of int, optional
+        A list of session IDs to filter the data by. If None, no filtering is applied.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the processed data with the following columns:
+        - 'Timestamp': Timestamp of the lap
+        - 'Session': Session ID
+        - 'Lap': Lap number
+        - 'Laptime (s)': Time taken to complete the lap in seconds
+        - 'Average speed (m/s)': Average speed during the lap in meters per second
+        - 'Distance (m)': Cumulative distance covered in meters
+
+    Examples
+    --------
+    >>> read_transponder('data.csv')
+    Returns a DataFrame with processed data from 'data.csv'.
+
+    >>> read_transponder('data.csv', sessions=[1, 2])
+    Returns a DataFrame with processed data from 'data.csv', filtered for sessions 1 and 2.
+
+    Notes
+    -----
+    The input CSV file should be encoded in 'utf-16-le' and should contain the following columns:
+    - 'Date': The date of the lap
+    - 'Start time': The start time of the lap
+    - 'Total time': The total time taken for the lap
+    - 'Laptime': The time taken for the lap
+    - 'Speed': The average speed during the lap in km/h
+    - 'Lap': The lap number
+    - 'Diff': The time difference from the previous lap
+    - 'Transponder': The transponder ID
+
+    """
     df = pd.read_csv(filename, encoding="utf-16-le").dropna(how="all")
 
     # add time and date
@@ -56,11 +105,36 @@ def read_transponder(filename=None, length=250, sessions=None):
 
 
 def _add_missing_observations(lap_distances):
-    # add observations where time continues, but the rider stand still
-    # this is such that Strava detects these as auto pauses
-    # calculate how many seconds are between each sessions, i.e. how long did the rider pause
-    # we need to add the time of the last lap to the timestamp
-    # as the timestamps are the start of the round
+    """
+    Add missing observations to account for auto-pauses in the lap data.
+
+    This function takes a DataFrame containing lap data and adds extra rows
+    to account for periods where the rider is stationary (auto-pauses).
+    This ensures that such periods are correctly identified in platforms like Strava.
+
+    Parameters
+    ----------
+    lap_distances : pd.DataFrame
+        A DataFrame containing lap data with the following columns:
+        - 'Timestamp': Timestamp of the lap
+        - 'Session': Session ID
+        - 'Lap': Lap number
+        - 'Laptime (s)': Time taken to complete the lap in seconds
+        - 'Average speed (m/s)': Average speed during the lap in meters per second
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the original data along with additional rows
+        for auto-pauses. The DataFrame will have the same columns as the input.
+
+    Notes
+    -----
+    The function calculates the pause length between sessions and adds extra
+    observations where the rider is stationary. These extra observations have
+    'Laptime (s)' and 'Average speed (m/s)' set to 0.
+
+    """
     gby = (
         lap_distances.assign(
             Timestamp_after_last_round=lap_distances["Timestamp"]
@@ -92,6 +166,47 @@ def _add_missing_observations(lap_distances):
 
 
 def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
+     """
+    Interpolate lap data to generate more granular observations.
+
+    This function takes a DataFrame containing lap data and performs interpolation
+    to generate observations with a frequency of 1 second. It also adjusts for 
+    time zones and adds additional columns for interpolated distance and time.
+
+    Parameters
+    ----------
+    lap_distances : pd.DataFrame
+        A DataFrame containing lap data with the following columns:
+        - 'Timestamp': Timestamp of the lap
+        - 'Session': Session ID
+        - 'Lap': Lap number
+        - 'Laptime (s)': Time taken to complete the lap in seconds
+        - 'Average speed (m/s)': Average speed during the lap in meters per second
+    length : int, optional
+        The length of the track in meters. The default is 250.
+    tz : str, optional
+        The time zone to localize the timestamps to. The default is "Europe/Brussels".
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the original data along with additional interpolated
+        rows and columns for distance and time. The DataFrame will have the following columns:
+        - 'Interpolated distance (m)': Cumulative distance covered in meters
+        - 'Distance covered': Distance covered on the velodrome in meters
+        - 'Interpolated time (s)': Interpolated timestamps localized to the given time zone
+
+    Notes
+    -----
+    The function performs several steps to interpolate the data:
+    1. Rounds lap times to the nearest second.
+    2. Adds counters to keep track of interpolated values.
+    3. Adds observations for paused seconds using `_add_missing_observations`.
+    4. Sorts the DataFrame and calculates intermediate distances and times.
+    5. Localizes the timestamps to the given time zone.
+
+    """
+
     # trick to copy each row t amount of times where t is the number of seconds needed to complete the quarter
     lap_distances["Laptime rounded (s)"] = (
         lap_distances["Laptime (s)"].round(0).astype(int)
@@ -170,6 +285,45 @@ def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
 
 
 def map_interpolation_to_velodrome(interpolation, velodrome):
+    """
+    Map interpolated lap data to a velodrome's geometry.
+
+    This function takes a DataFrame containing interpolated lap data and a
+    Velodrome object containing the velodrome's geometry. It merges the
+    DataFrame with the arc lengths from the Velodrome object based on the
+    distance covered on the velodrome mapping the interpolated
+    data to the velodrome's geometry.
+
+    Parameters
+    ----------
+    interpolation : pd.DataFrame
+        A DataFrame containing interpolated lap data with the following columns:
+        - 'Interpolated distance (m)': Cumulative distance covered in meters
+        - 'Distance covered': Distance covered on the velodrome in meters
+        - 'Interpolated time (s)': Interpolated timestamps
+    velodrome : Velodrome
+        A Velodrome object containing the velodrome's geometry. The object
+        should have an attribute `arc_length_wgs84` which is a DataFrame with
+        the following column:
+        - 'Arc length (m)': The arc length at various points on the velodrome in meters
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the original interpolated data along with the
+        velodrome's geometry. The DataFrame will have the following columns:
+        - 'Interpolated distance (m)'
+        - 'Distance covered'
+        - 'Interpolated time (s)'
+        - 'Arc length (m)'
+
+    Notes
+    -----
+    The function performs a left join between the `interpolation` DataFrame
+    and the `arc_length_wgs84` DataFrame from the `Velodrome` object based
+    on the 'Distance covered' and 'Arc length (m)' columns.
+
+    """
     arc_length = velodrome.arc_length_wgs84
 
     interpolation = interpolation[
@@ -184,6 +338,25 @@ def map_interpolation_to_velodrome(interpolation, velodrome):
 
 
 def parse_transponder(filename, length=250, tz="Europe/Brussels", sessions=None):
+    """
+    Parse and interpolate transponder data from a csv file coming from https://results.sporthive.com.
+
+    Parameters
+    ----------
+    filename : str
+        Path to the csb file containing transponder data.
+    length : int, optional
+        Length of the track in meters. Default is 250.
+    tz : str, optional
+        Time zone for timestamps. Default is "Europe/Brussels".
+    sessions : list of int, optional
+        List of session IDs to filter by. Default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing interpolated lap data.
+    """
 
     transponder = read_transponder(filename, length=length, sessions=sessions)
     interpolation = interpolate(transponder, length=length, tz=tz)
