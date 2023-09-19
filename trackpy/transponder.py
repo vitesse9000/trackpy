@@ -166,7 +166,7 @@ def _add_missing_observations(lap_distances):
 
 
 def interpolate(lap_distances, length=250, tz="Europe/Brussels"):
-     """
+    """
     Interpolate lap data to generate more granular observations.
 
     This function takes a DataFrame containing lap data and performs interpolation
