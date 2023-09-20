@@ -19,22 +19,40 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-csvfile = args.input
-gpxfile = args.output
+csvfile = pathlib.Path(args.input)
+gpxfile = pathlib.Path(args.output)
 if args.sessions is None:
     sessions = None
 else:
     sessions = list(map(int, args.sessions.split(",")))
 
-wielercentrum = track.velodrome.Velodrome(
-    "Eddy Mercx Wielercentrum",
-    center_utm=(548540.34, 5655259.58),
-    rotation=-18,
-    elevation=7,
-    length=250,
-    precision=0.1,
-    start_finish=np.round(np.pi * 27.7 + 2 * 38, decimals=1),
-)
+
+# Construct Velodrome
+velodrome_csv = pathlib.Path("eddy_merckx_wielercentrum_wgs84.csv")
+name = ("Eddy Merckx Wielercentrum",)
+elevation = 7
+start_finish = np.round(np.pi * 27.7 + 2 * 38, decimals=1)
+
+if not velodrome_csv.is_file():
+    wielercentrum = track.velodrome.Velodrome(
+        name,
+        center_utm=(548540.34, 5655259.58),
+        rotation=-18,
+        length=250,
+        precision=0.1,
+        elevation=elevation,
+        start_finish=start_finish,
+    )
+    wielercentrum.save(velodrome_csv)
+else:
+    arc_length_wgs84 = pd.read_csv(velodrome_csv)
+
+    wielercentrum = track.velodrome.BaseVelodrome(
+        name,
+        elevation=elevation,
+        start_finish=start_finish,
+        arc_length_wgs84=arc_length_wgs84,
+    )
 
 filename = pathlib.Path(csvfile)
 parsing_info = f"Parsing {filename}"
