@@ -33,6 +33,7 @@ name = ("Eddy Merckx Wielercentrum",)
 elevation = 7
 start_finish = np.round(np.pi * 27.7 + 2 * 38, decimals=1)
 
+# construct Velodrome from scratch
 if not velodrome_csv.is_file():
     wielercentrum = track.velodrome.Velodrome(
         name,
@@ -44,6 +45,8 @@ if not velodrome_csv.is_file():
         start_finish=start_finish,
     )
     wielercentrum.save(velodrome_csv)
+
+# construct from csv if it exists
 else:
     arc_length_wgs84 = pd.read_csv(velodrome_csv)
 
@@ -61,11 +64,14 @@ if sessions:
 else:
     parsing_info += f" for all sessions"
 
+# Parse transponder
 logging.info(parsing_info)
 transponder = track.parse_transponder(filename, sessions=sessions)
 
+# Combine transponder and velodrome
 logging.info(f"Mapping {filename} to the Eddy Merck wielercentrum")
 interpolation = track.map_interpolation_to_velodrome(transponder, wielercentrum)
 
+# Write to GPX
 logging.info(f"Writing to {gpxfile}")
 track.write_gpx(gpxfile, interpolation, velodrome=wielercentrum)
